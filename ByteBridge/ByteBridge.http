@@ -1,0 +1,6 @@
+@ByteBridge_HostAddress = http://localhost:5191
+
+GET {{ByteBridge_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
