@@ -14,6 +14,9 @@ namespace ByteBridge.Repository
         }
         public async Task<Files> CreateFile(Files file)
         {
+            file.CreatedOn = DateTime.Now;
+            file.UpdatedOn = DateTime.Now;
+
             var result = await dbContext.Files.AddAsync(file);
             await dbContext.SaveChangesAsync();
 
