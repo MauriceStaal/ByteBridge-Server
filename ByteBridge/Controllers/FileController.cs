@@ -5,22 +5,26 @@ using ByteBridge.Helper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using ByteBridge.Entities;
+using Microsoft.OpenApi;
 
 namespace ByteBridge.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [ApiController]
+    [ApiVersion("1.0")]
     public class FileController : ControllerBase
     {
         private readonly IFileRepository _fileRepository;
         private readonly IFileAttachmentRepository _fileAttachmentRepository;
-        public FileController(IFileRepository fileRepository, IFileAttachmentRepository fileAttachmentRepository)
+        private readonly int apiVersion;
+        public FileController(IFileRepository fileRepository, IFileAttachmentRepository fileAttachmentRepository, IConfiguration config)
         {
             _fileRepository = fileRepository;
             _fileAttachmentRepository = fileAttachmentRepository;
+            apiVersion = int.Parse(config["APIVersionManagement:Version"]!);
         }
 
-        [HttpGet]
+        [HttpGet, MapToApiVersion("1.0")]
         public async Task<ActionResult<IEnumerable<FileDto>>> Get()
         {
             try
@@ -39,7 +43,7 @@ namespace ByteBridge.Controllers
             }
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{id}"), MapToApiVersion("1.0")]
         public async Task<ActionResult> Get(int id)
         {
             try
@@ -63,7 +67,7 @@ namespace ByteBridge.Controllers
             }
         }
 
-        [HttpPost]
+        [HttpPost, MapToApiVersion("1.0")]
         [Consumes("multipart/form-data")]
         public async Task<ActionResult<FileDto>> Post([FromForm] FileWithAttachmentDto file)
         {
@@ -95,7 +99,7 @@ namespace ByteBridge.Controllers
             }
         }
 
-        [HttpPut("{id}")]
+        [HttpPut("{id}"), MapToApiVersion("1.0")]
         public async Task<ActionResult<FileDto>> Update(FileDto file)
         {
             try
@@ -109,7 +113,7 @@ namespace ByteBridge.Controllers
             }
         }
 
-        [HttpDelete("{id}")]
+        [HttpDelete("{id}"), MapToApiVersion("1.0")]
         public async Task<ActionResult> Delete(int id)
         {
                 try
