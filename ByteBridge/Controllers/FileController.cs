@@ -1,11 +1,10 @@
 ﻿using ByteBridge.Extensions;
 using ByteBridge.Models;
 using ByteBridge.Repository.Contracts;
+using ByteBridge.Helper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
-using System.Net;
-using System.Reflection.Metadata.Ecma335;
-
+using ByteBridge.Entities;
 
 namespace ByteBridge.Controllers
 {
@@ -14,9 +13,11 @@ namespace ByteBridge.Controllers
     public class FileController : ControllerBase
     {
         private readonly IFileRepository _fileRepository;
-        public FileController(IFileRepository fileRepository)
+        private readonly IFileAttachmentRepository _fileAttachmentRepository;
+        public FileController(IFileRepository fileRepository, IFileAttachmentRepository fileAttachmentRepository)
         {
             _fileRepository = fileRepository;
+            _fileAttachmentRepository = fileAttachmentRepository;
         }
 
         [HttpGet]
@@ -39,7 +40,7 @@ namespace ByteBridge.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<FileDto>> Get(int id)
+        public async Task<ActionResult> Get(int id)
         {
             try
             {
@@ -48,7 +49,13 @@ namespace ByteBridge.Controllers
                 {
                     return NotFound();
                 }
-                return Ok(file.ToDto());
+                if (!System.IO.File.Exists(file.Path))
+                {
+                    return NotFound("File not found on server");
+                }
+
+                var fileStream = new FileStream(file.Path, FileMode.Open, FileAccess.Read);
+                return File(fileStream, "application/octet-stream", file.Name);
             }
             catch (Exception ex)
             {
@@ -57,11 +64,29 @@ namespace ByteBridge.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<FileDto>> Post(FileDto file)
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<FileDto>> Post([FromForm] FileWithAttachmentDto file)
         {
             try
             {
-                var result = await _fileRepository.CreateFile(file.FromDto());
+                if (file.FileAttachment == null || file.FileAttachment.Length == 0)
+                {
+                    return BadRequest("File attachment is required!");
+                }
+
+                var filePath = await _fileAttachmentRepository.UploadFile(file.Name, file.FileAttachment.OpenReadStream());
+
+                var fileHash = await HashFileAttachmentHelper.CalculateFileHashAsync(file.FileAttachment.OpenReadStream());
+
+                var fileRecord = new FileDto
+                {
+                    Name = file.Name,
+                    Path = filePath,
+                    Hash = fileHash,
+                };
+
+                var result = await _fileRepository.CreateFile(fileRecord.FromDto());
+
                 return result.ToDto();
             }
             catch (Exception ex)
@@ -89,9 +114,15 @@ namespace ByteBridge.Controllers
         {
                 try
                 {
-                    await _fileRepository.DeleteFile(id);
-                    return Ok();
+                var result = await _fileRepository.GetFile(id);
+                if (result != null)
+                {
+                    await _fileAttachmentRepository.DeleteFile(result.Path);
                 }
+                await _fileRepository.DeleteFile(id);
+                return Ok();
+                }
+
                 catch (Exception ex)
                 {
                     return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
